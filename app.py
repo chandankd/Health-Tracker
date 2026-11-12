@@ -207,46 +207,54 @@ with tab_feed:
                         day_log["entries"].pop(real_idx)
                         save_data(data); st.rerun()
 
-# ----------------- TAB 2: ADD LOG -----------------
+# ----------------- TAB 2: ADD LOG (COMBINED SEARCH & AI) -----------------
 with tab_add:
-    sub1, sub2, sub3 = st.tabs(["🔍 Database", "✨ AI Text", "📷 Photo"])
+    sub1, sub3 = st.tabs(["✨ Smart Search & AI", "📷 Photo Scan"])
 
     with sub1:
-        selected_food = st.selectbox("Search Food or Exercise", options=[""] + list(FOOD_DB.keys()))
-        qty = st.slider("Portions / Multiplier", 0.5, 5.0, 1.0, 0.5)
-        if selected_food:
+        st.caption("1️⃣ Pick from the database OR 2️⃣ Type ANY custom food (like 'Alu fry' or '30 min jogging') to have AI calculate it!")
+        
+        # 1. Database Selection (Optional)
+        selected_food = st.selectbox("1. Browse Database (Optional)", options=[""] + list(FOOD_DB.keys()))
+        
+        st.markdown("<div style='text-align:center; font-weight:bold; margin: 10px 0; color: #7A867A;'>— OR —</div>", unsafe_allow_html=True)
+        
+        # 2. Free Text Input for AI
+        user_query = st.text_input("2. Type anything (AI will calculate it instantly)", placeholder="e.g., Alu fry or 5 km walk...")
+
+        # LOGIC:
+        if selected_food and not user_query:
+            qty = st.slider("Portions / Multiplier", 0.5, 5.0, 1.0, 0.5)
             item_data = FOOD_DB[selected_food]
-            is_ex = item_data.get("is_exercise", False)
             s_cal = int(item_data["cal"] * qty)
             st.info(f"**Selected:** {selected_food} (x{qty}) → **{abs(s_cal)} kcal**")
             
-            if st.button("✅ Add to Log", key="db_add"):
+            if st.button("✅ Add Database Item to Log", key="db_add"):
                 day_log["entries"].append({
                     "title": f"{selected_food} (x{qty})" if qty != 1.0 else selected_food,
                     "subtitle": "Database Log",
                     "cal": s_cal, "c": int(item_data["c"] * qty), "p": int(item_data["p"] * qty), "f": int(item_data["f"] * qty),
-                    "is_exercise": is_ex, "time": datetime.now().strftime("%I:%M %p")
+                    "is_exercise": item_data.get("is_exercise", False), "time": datetime.now().strftime("%I:%M %p")
                 })
                 save_data(data); st.success("Added!"); st.rerun()
 
-    with sub2:
-        user_query = st.text_input("Type meal or workout (Hindi/Eng/Odia):")
-        if st.button("✨ Analyze with AI") and user_query:
-            with st.spinner("Calculating..."):
-                prompt = f"""Analyze: "{user_query}". Return ONLY raw JSON:
-                {{"title": "Name", "subtitle": "AI Text", "cal": 250, "c": 30, "p": 12, "f": 8, "is_exercise": false}}
-                If exercise/workout (steps, jogging), set "is_exercise": true, "c":0, "p":0, "f":0, and "cal" as NEGATIVE integer (-200)."""
-                try:
-                    resp = model.generate_content(prompt)
-                    st.session_state["ai_draft"] = json.loads(resp.text.replace("```json", "").replace("```", "").strip())
-                except: st.error("AI Error. Try again.")
+        elif user_query:
+            if st.button("✨ Analyze with AI"):
+                with st.spinner("Calculating nutrition..."):
+                    prompt = f"""Analyze: "{user_query}". Return ONLY raw JSON:
+                    {{"title": "Name", "subtitle": "AI Text", "cal": 250, "c": 30, "p": 12, "f": 8, "is_exercise": false}}
+                    If exercise/workout (steps, jogging), set "is_exercise": true, "c":0, "p":0, "f":0, and "cal" as NEGATIVE integer (-200)."""
+                    try:
+                        resp = model.generate_content(prompt)
+                        st.session_state["ai_draft"] = json.loads(resp.text.replace("```json", "").replace("```", "").strip())
+                    except: st.error("AI Error. Try again.")
 
-        if "ai_draft" in st.session_state:
-            d = st.session_state["ai_draft"]
-            st.success(f"**{d['title']}** → {abs(d['cal'])} kcal")
-            if st.button("💾 Save AI Entry"):
-                d["time"] = datetime.now().strftime("%I:%M %p")
-                day_log["entries"].append(d); save_data(data); del st.session_state["ai_draft"]; st.rerun()
+            if "ai_draft" in st.session_state:
+                d = st.session_state["ai_draft"]
+                st.success(f"**{d['title']}** → {abs(d['cal'])} kcal | P: {d['p']}g | C: {d['c']}g | F: {d['f']}g")
+                if st.button("💾 Save AI Entry to Log"):
+                    d["time"] = datetime.now().strftime("%I:%M %p")
+                    day_log["entries"].append(d); save_data(data); del st.session_state["ai_draft"]; st.rerun()
 
     with sub3:
         enable_cam = st.toggle("🔓 Switch ON Camera")
