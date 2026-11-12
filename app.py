@@ -5,7 +5,7 @@ import os
 from datetime import date, datetime, timedelta
 from PIL import Image
 
-# ================= 1. PAGE CONFIG & CSS =================
+# ================= 1. PAGE CONFIG & ZENCALORIE EXACT CSS =================
 st.set_page_config(page_title="ZenCalorie AI", page_icon="🍏", layout="centered")
 
 st.markdown("""
@@ -18,6 +18,9 @@ st.markdown("""
 .meal-card { background: white; border-radius: 20px; padding: 18px; box-shadow: 0 3px 10px rgba(0,0,0,0.04); margin-bottom: 5px; margin-top: 15px; }
 .meal-title { font-size: 17px; font-weight: 700; color: #1C241C; margin-bottom: 2px; }
 .meal-sub { font-size: 13px; color: #7A867A; margin-bottom: 12px; }
+.ing-title { font-size: 15px; font-weight: 700; color: #1C241C; margin-top: 10px; margin-bottom: 6px; }
+.chip-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.chip { background: #F1F6EE; padding: 4px 12px; border-radius: 10px; font-size: 12px; font-weight: 600; color: #2C352C; }
 .macro-grid { display: flex; justify-content: space-around; text-align: center; border-top: 1px solid #F0F3EF; padding-top: 12px; margin-top: 8px; }
 .m-label { font-size: 10px; color: #7A867A; font-weight: 700; letter-spacing: 0.5px; }
 .m-cal { font-size: 18px; font-weight: 800; color: #558B2F; }
@@ -30,7 +33,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ================= 2. GEMINI MODEL LOADER =================
+# ================= 2. ULTRA-FAST GEMINI MODEL LOADER =================
 @st.cache_resource
 def init_gemini():
     api_key = st.secrets.get("GEMINI_API_KEY", "")
@@ -38,7 +41,8 @@ def init_gemini():
     genai.configure(api_key=api_key)
     try:
         available = [m.name.replace("models/", "") for m in genai.list_models() if "generateContent" in m.supported_generation_methods]
-        for p in ["gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]:
+        # Prioritize 8b model - it is Google's fastest model for simple JSON tasks
+        for p in ["gemini-1.5-flash-8b", "gemini-1.5-flash", "gemini-flash-latest"]:
             if p in available: return genai.GenerativeModel(p)
         if available: return genai.GenerativeModel(available[0])
     except Exception: pass
@@ -155,7 +159,7 @@ st.markdown(
 )
 
 # ================= 7. MAIN TABS =================
-tab_feed, tab_add, tab_water, tab_prof = st.tabs(["📋 Activity Feed", "➕ Add Log", "💧 Water", "⚙️ Goals"])
+tab_feed, tab_add, tab_water, tab_prof = st.tabs(["📋 Feed", "➕ Add Log", "💧 Water", "⚙️ Goals"])
 
 # ----------------- TAB 1: EDITABLE FEED -----------------
 with tab_feed:
@@ -196,14 +200,14 @@ with tab_feed:
 
 # ----------------- TAB 2: ADD LOG -----------------
 with tab_add:
-    sub1, sub3 = st.tabs(["✨ Smart Search & AI", "📷 Photo Scan"])
+    sub1, sub3, sub4 = st.tabs(["✨ Smart Search", "📷 Photo Scan", "⌨️ Manual Entry"])
 
+    # 1. SMART SEARCH & AI
     with sub1:
-        st.caption("1️⃣ Pick from the database OR 2️⃣ Type ANY custom food (like 'Alu fry' or '30 min jogging') to have AI calculate it!")
+        st.caption("1️⃣ Pick from database OR 2️⃣ Type ANY custom food (like 'Alu fry')")
         selected_food = st.selectbox("1. Browse Database (Optional)", options=[""] + list(FOOD_DB.keys()))
-        
         st.markdown("<div style='text-align:center; font-weight:bold; margin: 10px 0; color: #7A867A;'>— OR —</div>", unsafe_allow_html=True)
-        user_query = st.text_input("2. Type anything (AI will calculate it instantly)", placeholder="e.g., Alu fry or 5 km walk...")
+        user_query = st.text_input("2. Type anything (AI will calculate)", placeholder="e.g., Alu fry or 5 km walk...")
 
         if selected_food and not user_query:
             qty = st.slider("Portions / Multiplier", 0.5, 5.0, 1.0, 0.5)
@@ -221,22 +225,21 @@ with tab_add:
 
         elif user_query:
             if st.button("✨ Analyze with AI"):
-                with st.spinner("Calculating nutrition..."):
-                    # CRITICAL FIX: Explicit JSON Schema to prevent Markdown/Text crashing
-                    prompt = f"""Analyze the food or activity: "{user_query}". 
-                    You must return a valid JSON object matching this EXACT schema with integer values:
-                    {{"title": "Food Name", "subtitle": "AI Text", "cal": 250, "c": 30, "p": 12, "f": 8, "is_exercise": false}}
-                    Rules: If it is an exercise, set "is_exercise": true, macros to 0, and "cal" to a NEGATIVE integer."""
+                with st.spinner("Calculating nutrition (Max 10s)..."):
+                    prompt = f"""Analyze: "{user_query}". 
+                    Return EXACT JSON ONLY:
+                    {{"title": "Name", "subtitle": "AI Text", "cal": 250, "c": 30, "p": 12, "f": 8, "is_exercise": false}}
+                    If exercise, set "is_exercise": true, macros to 0, and "cal" as NEGATIVE."""
                     try:
-                        # Enforce JSON output format directly in Gemini API
+                        # Adding strict timeout so it doesn't spin forever on bad Wi-Fi
                         resp = model.generate_content(
                             prompt, 
-                            generation_config={"response_mime_type": "application/json"}
+                            generation_config={"response_mime_type": "application/json"},
+                            request_options={"timeout": 10}
                         )
-                        clean_text = resp.text.strip()
-                        st.session_state["ai_draft"] = json.loads(clean_text)
+                        st.session_state["ai_draft"] = json.loads(resp.text.strip())
                     except Exception as e: 
-                        st.error(f"AI Error: Could not process request. Details: {e}")
+                        st.error(f"Network Timeout. The Wi-Fi latency was too high, or the AI was busy. Please try again or use the Manual tab.")
 
             if "ai_draft" in st.session_state:
                 d = st.session_state["ai_draft"]
@@ -245,21 +248,23 @@ with tab_add:
                     d["time"] = datetime.now().strftime("%I:%M %p")
                     day_log["entries"].append(d); save_data(data); del st.session_state["ai_draft"]; st.rerun()
 
+    # 2. PHOTO SCAN
     with sub3:
         enable_cam = st.toggle("🔓 Switch ON Camera")
         img_file = st.camera_input("Snap plate") if enable_cam else st.file_uploader("Upload photo", type=["jpg", "png"])
         if img_file and st.button("🔍 Scan Photo"):
-            with st.spinner("Scanning..."):
-                prompt = """Analyze this photo. Return a valid JSON object matching this EXACT schema:
-                {"title": "Food Name", "subtitle": "AI Photo Scan", "cal": 350, "c": 45, "p": 15, "f": 10, "is_exercise": false}"""
+            with st.spinner("Scanning (Max 15s)..."):
+                prompt = """Analyze photo. Return EXACT JSON ONLY:
+                {"title": "Name", "subtitle": "AI Photo Scan", "cal": 350, "c": 45, "p": 15, "f": 10, "is_exercise": false}"""
                 try:
                     resp = model.generate_content(
                         [prompt, Image.open(img_file)],
-                        generation_config={"response_mime_type": "application/json"}
+                        generation_config={"response_mime_type": "application/json"},
+                        request_options={"timeout": 15}
                     )
                     st.session_state["photo_draft"] = json.loads(resp.text.strip())
                 except Exception as e: 
-                    st.error(f"Photo scan failed: {e}")
+                    st.error("Network Timeout. Photo scanning takes extra data. Try the Text or Manual tabs.")
 
         if "photo_draft" in st.session_state:
             pd = st.session_state["photo_draft"]
@@ -267,8 +272,31 @@ with tab_add:
             if st.button("💾 Save Photo"):
                 pd["time"] = datetime.now().strftime("%I:%M %p")
                 day_log["entries"].append(pd); save_data(data); del st.session_state["photo_draft"]; st.rerun()
+                
+    # 3. MANUAL ENTRY (FALLBACK FOR SLOW INTERNET)
+    with sub4:
+        st.caption("If the AI is taking too long on slow Wi-Fi, you can instantly log the exact numbers here.")
+        man_title = st.text_input("Meal or Workout Name")
+        mc1, mc2 = st.columns(2)
+        man_cal = mc1.number_input("Calories (Negative for Exercise)", step=10, value=0)
+        man_p = mc2.number_input("Protein (g)", min_value=0, step=1, value=0)
+        mc3, mc4 = st.columns(2)
+        man_c = mc3.number_input("Carbs (g)", min_value=0, step=1, value=0)
+        man_f = mc4.number_input("Fat (g)", min_value=0, step=1, value=0)
+        
+        if st.button("💾 Save Manual Entry"):
+            if man_title:
+                day_log["entries"].append({
+                    "title": man_title, "subtitle": "Manual Entry",
+                    "cal": man_cal, "c": man_c, "p": man_p, "f": man_f,
+                    "is_exercise": True if man_cal < 0 else False,
+                    "time": datetime.now().strftime("%I:%M %p")
+                })
+                save_data(data); st.success("Added instantly!"); st.rerun()
+            else:
+                st.warning("Please enter a name first.")
 
-# ----------------- TAB 3 & 4 (UNCHANGED) -----------------
+# ----------------- TAB 3: WATER -----------------
 with tab_water:
     st.markdown('<div class="meal-card">', unsafe_allow_html=True)
     st.subheader(f"💧 Hydration: {day_log['water_ml']} / {prof['water_goal']} ml")
@@ -279,6 +307,7 @@ with tab_water:
     if w3.button("Reset"): day_log["water_ml"] = 0; save_data(data); st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
+# ----------------- TAB 4: GOALS -----------------
 with tab_prof:
     st.markdown('<div class="meal-card">', unsafe_allow_html=True)
     st.subheader("⚖️ Body Details & Goals")
