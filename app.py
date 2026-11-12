@@ -18,6 +18,7 @@ st.markdown("""
     }
     .macro-text { font-size: 14px; color: #555; margin-bottom: 2px; }
     .macro-val { font-size: 18px; font-weight: bold; color: #333; }
+    .stTabs [data-baseweb="tab-list"] { gap: 10px; justify-content: center; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -28,17 +29,24 @@ try:
 except KeyError:
     st.error("⚠️ Gemini API Key missing! Add GEMINI_API_KEY to Streamlit Secrets.")
 
-# 3. Data Storage
+# 3. Data Storage (Including Profile for BMI & Targets)
 DATA_FILE = "zentrack_data.json"
 TODAY = str(date.today())
 
 def load_data():
+    default_data = {
+        "profile": {"height_cm": 170.0, "weight_kg": 70.0, "target_cals": 2200, "target_p": 120, "target_c": 250, "target_f": 60}
+    }
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, "r") as f:
             data = json.load(f)
-            if TODAY in data:
-                return data
-    return {TODAY: {"calories_in": 0, "calories_burned": 0, "protein": 0, "carbs": 0, "fat": 0, "water_ml": 0, "meals": [], "activity": []}}
+            if "profile" not in data:
+                data["profile"] = default_data["profile"]
+            if TODAY not in data:
+                data[TODAY] = {"calories_in": 0, "calories_burned": 0, "protein": 0, "carbs": 0, "fat": 0, "meals": [], "activity": []}
+            return data
+    default_data[TODAY] = {"calories_in": 0, "calories_burned": 0, "protein": 0, "carbs": 0, "fat": 0, "meals": [], "activity": []}
+    return default_data
 
 def save_data(data):
     with open(DATA_FILE, "w") as f:
@@ -46,112 +54,152 @@ def save_data(data):
 
 data = load_data()
 day = data[TODAY]
-TARGET_CALS = 2200
-
-# Calculate Net Calories
+profile = data["profile"]
 net_calories = day["calories_in"] - day["calories_burned"]
 
-# 4. UI: Dashboard & Full Day Summary
-st.title("🍏 ZenTrack AI")
-st.markdown(f"**Today:** {date.today().strftime('%d %b %Y')}")
+# 4. App Navigation Tabs
+nav1, nav2, nav3, nav4 = st.tabs(["📊 Dashboard", "📸 Log Meal", "🏃‍♂️ Activity", "⚙️ Profile"])
 
-st.markdown('<div class="card">', unsafe_allow_html=True)
-st.subheader("📊 Track Your Full Day Summary")
-st.write(f"**Eaten:** {day['calories_in']} kcal | **Burned:** {day['calories_burned']} kcal | **Net:** {net_calories} kcal")
-st.progress(min(max(net_calories / TARGET_CALS, 0.0), 1.0))
+# ================= DASHBOARD TAB =================
+with nav1:
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.subheader(f"Today: {date.today().strftime('%d %b %Y')}")
+    st.write(f"**Eaten:** {day['calories_in']} | **Burned:** {day['calories_burned']} | **Net:** {net_calories} / {profile['target_cals']} kcal")
+    st.progress(min(max(net_calories / profile['target_cals'], 0.0), 1.0))
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown('<p class="macro-text">Protein</p>', unsafe_allow_html=True)
+        st.markdown(f'<p class="macro-val">{day["protein"]}g / {profile["target_p"]}g</p>', unsafe_allow_html=True)
+    with col2:
+        st.markdown('<p class="macro-text">Carbs</p>', unsafe_allow_html=True)
+        st.markdown(f'<p class="macro-val">{day["carbs"]}g / {profile["target_c"]}g</p>', unsafe_allow_html=True)
+    with col3:
+        st.markdown('<p class="macro-text">Fat</p>', unsafe_allow_html=True)
+        st.markdown(f'<p class="macro-val">{day["fat"]}g / {profile["target_f"]}g</p>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.subheader("🍽️ Meals Logged")
+    if not day['meals']:
+        st.write("No meals logged today yet.")
+    for meal in day['meals']:
+        st.write(meal)
+    st.markdown('</div>', unsafe_allow_html=True)
 
-col1, col2, col3 = st.columns(3)
-with col1:
-    st.markdown('<p class="macro-text">Protein</p>', unsafe_allow_html=True)
-    st.markdown(f'<p class="macro-val">{day["protein"]}g</p>', unsafe_allow_html=True)
-with col2:
-    st.markdown('<p class="macro-text">Carbs</p>', unsafe_allow_html=True)
-    st.markdown(f'<p class="macro-val">{day["carbs"]}g</p>', unsafe_allow_html=True)
-with col3:
-    st.markdown('<p class="macro-text">Fat</p>', unsafe_allow_html=True)
-    st.markdown(f'<p class="macro-val">{day["fat"]}g</p>', unsafe_allow_html=True)
-st.markdown('</div>', unsafe_allow_html=True)
+# ================= LOG MEAL TAB =================
+with nav2:
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    log1, log2, log3 = st.tabs(["Just Type", "AI Photo", "Manual"])
+    
+    with log1:
+        st.info("💡 Type in Hindi, English, or Odia (e.g., '1 katori dalma aur 1 cup rice')")
+        food_text = st.text_input("What did you eat?")
+        if st.button("Calculate Text Macros"):
+            if food_text:
+                with st.spinner("Calculating..."):
+                    prompt = f"User said: '{food_text}'. Understand Hindi/Odia/Indian food. Estimate calories and macros. Return ONLY valid JSON with keys: 'food_name', 'calories', 'protein', 'carbs', 'fat' as integers. No markdown."
+                    res_text = model.generate_content(prompt)
+                    try:
+                        res = json.loads(res_text.text.replace('```json', '').replace('```', '').strip())
+                        st.success(f"Estimated: {res['food_name']} ({res['calories']} kcal)")
+                        if st.button("Save this meal"):
+                            day['calories_in'] += int(res['calories']); day['protein'] += int(res['protein']); day['carbs'] += int(res['carbs']); day['fat'] += int(res['fat'])
+                            day['meals'].append(f"✍️ {res['food_name']} ({res['calories']} kcal)")
+                            save_data(data); st.rerun()
+                    except:
+                        st.error("Error calculating. Please try again.")
 
-# 5. UI: AI Food Scanner & Manual Entry (Hindi/Indian Food Support)
-st.markdown('<div class="card">', unsafe_allow_html=True)
-st.subheader("📸 Log Meals")
-tab1, tab2, tab3 = st.tabs(["Just Type", "AI Photo", "Manual Numbers"])
+    with log2:
+        st.warning("🔒 Camera is off to save battery.")
+        # FIX: The camera only turns on when this switch is turned ON.
+        camera_on = st.toggle("📷 Switch on Camera to snap meal")
+        if camera_on:
+            photo = st.camera_input("Take a picture of your food")
+            if photo:
+                with st.spinner("Analyzing AI-Powered Photo..."):
+                    prompt = "Analyze this food image. Identify Indian/Odia dishes if present. Return ONLY valid JSON with keys: 'food_name', 'calories', 'protein', 'carbs', 'fat' as integers. No markdown."
+                    res_text = model.generate_content([prompt, Image.open(photo)])
+                    try:
+                        res = json.loads(res_text.text.replace('```json', '').replace('```', '').strip())
+                        st.success(f"Detected: {res['food_name']} ({res['calories']} kcal)")
+                        if st.button("Save Photo Meal"):
+                            day['calories_in'] += int(res['calories']); day['protein'] += int(res['protein']); day['carbs'] += int(res['carbs']); day['fat'] += int(res['fat'])
+                            day['meals'].append(f"📸 {res['food_name']} ({res['calories']} kcal)")
+                            save_data(data); st.rerun()
+                    except:
+                        st.error("Could not scan clearly.")
 
-with tab1:
-    st.info("💡 You can type in Hindi, English, or Odia (e.g., 'Maine 2 idli aur 1 katori dalma khaya' or '1 bowl oats with chia seeds')")
-    food_text = st.text_input("What did you eat?")
-    if st.button("Calculate Macros"):
-        if food_text:
+    with log3:
+        m_name = st.text_input("Food Name")
+        col_c, col_p, col_cb, col_f = st.columns(4)
+        m_cal = col_c.number_input("Kcal", min_value=0, step=10)
+        m_pro = col_p.number_input("Protein", min_value=0, step=1)
+        m_car = col_cb.number_input("Carbs", min_value=0, step=1)
+        m_fat = col_f.number_input("Fat", min_value=0, step=1)
+        if st.button("Save Manual"):
+            day['calories_in'] += m_cal; day['protein'] += m_pro; day['carbs'] += m_car; day['fat'] += m_fat
+            day['meals'].append(f"🔢 {m_name} ({m_cal} kcal)")
+            save_data(data); st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ================= ACTIVITY TAB =================
+with nav3:
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.subheader("🏃‍♂️ Log Daily Exercise")
+    act_text = st.text_input("Type your workout (e.g., '30 min jogging')")
+    if st.button("Calculate Burned Calories"):
+        if act_text:
             with st.spinner("Calculating..."):
-                prompt = f"""
-                You are an expert Indian nutritionist. The user said: '{food_text}'.
-                Understand Hindi, Hinglish, Odia, South Indian, and English food terms. 
-                Estimate total calories and macros for this meal.
-                Return ONLY valid JSON with keys: "food_name", "calories", "protein", "carbs", "fat". Values must be integers. Do not use markdown blocks.
-                """
-                response = model.generate_content(prompt)
+                act_prompt = f"User did: '{act_text}'. Estimate calories burned. Return ONLY valid JSON with keys: 'activity_name', 'calories_burned' (integer). No markdown."
+                act_res_text = model.generate_content(act_prompt)
                 try:
-                    res = json.loads(response.text.replace('```json', '').replace('```', '').strip())
-                    st.success(f"Estimated: {res['food_name']}")
-                    st.write(f"**Calories:** {res['calories']} | **P:** {res['protein']}g | **C:** {res['carbs']}g | **F:** {res['fat']}g")
-                    
-                    if st.button("Save this meal"):
-                        day['calories_in'] += int(res['calories'])
-                        day['protein'] += int(res['protein'])
-                        day['carbs'] += int(res['carbs'])
-                        day['fat'] += int(res['fat'])
-                        day['meals'].append(f"✍️ {res['food_name']} ({res['calories']} kcal)")
+                    act_res = json.loads(act_res_text.text.replace('```json', '').replace('```', '').strip())
+                    st.success(f"Burned {act_res['calories_burned']} kcal from {act_res['activity_name']}")
+                    if st.button("Save Workout"):
+                        day['calories_burned'] += int(act_res['calories_burned'])
+                        day['activity'].append(f"🏃 {act_res['activity_name']} (-{act_res['calories_burned']} kcal)")
                         save_data(data); st.rerun()
                 except:
-                    st.error("Error reading data. Try again.")
+                    st.error("Error reading workout data.")
+    
+    if day['activity']:
+        st.write("---")
+        for act in day['activity']:
+            st.write(act)
+    st.markdown('</div>', unsafe_allow_html=True)
 
-with tab2:
-    photo = st.camera_input("Snap your meal")
-    if photo:
-        with st.spinner("Analyzing AI-Powered Photo..."):
-            prompt = "Analyze this food image. Identify Indian/Odia dishes if present. Return ONLY valid JSON with keys: 'food_name', 'calories', 'protein', 'carbs', 'fat' as integers. No markdown."
-            response = model.generate_content([prompt, Image.open(photo)])
-            try:
-                res = json.loads(response.text.replace('```json', '').replace('```', '').strip())
-                st.success(f"Detected: {res['food_name']}")
-                st.write(f"**Calories:** {res['calories']} | **P:** {res['protein']}g")
-                if st.button("Save Photo Meal"):
-                    day['calories_in'] += int(res['calories']); day['protein'] += int(res['protein']); day['carbs'] += int(res['carbs']); day['fat'] += int(res['fat'])
-                    day['meals'].append(f"📸 {res['food_name']} ({res['calories']} kcal)")
-                    save_data(data); st.rerun()
-            except:
-                st.error("Could not scan clearly.")
+# ================= PROFILE & BMI TAB =================
+with nav4:
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.subheader("⚖️ BMI Calculator")
+    h_cm = st.number_input("Height (cm)", min_value=50.0, max_value=250.0, value=float(profile.get("height_cm", 170.0)))
+    w_kg = st.number_input("Weight (kg)", min_value=20.0, max_value=200.0, value=float(profile.get("weight_kg", 70.0)))
+    
+    bmi = w_kg / ((h_cm / 100) ** 2)
+    st.write(f"**Your BMI is: {bmi:.1f}**")
+    
+    if bmi < 18.5: st.info("Status: Underweight")
+    elif 18.5 <= bmi < 24.9: st.success("Status: Normal weight")
+    elif 25 <= bmi < 29.9: st.warning("Status: Overweight")
+    else: st.error("Status: Obese")
+    st.markdown('</div>', unsafe_allow_html=True)
 
-with tab3:
-    col_n, col_c = st.columns(2)
-    m_name = col_n.text_input("Food Name")
-    m_cal = col_c.number_input("Kcal", min_value=0, step=10)
-    if st.button("Save Manual"):
-        day['calories_in'] += m_cal; day['meals'].append(f"🔢 {m_name} ({m_cal} kcal)")
-        save_data(data); st.rerun()
-st.markdown('</div>', unsafe_allow_html=True)
-
-# 6. UI: Log Your Daily Exercise
-st.markdown('<div class="card">', unsafe_allow_html=True)
-st.subheader("🏃‍♂️ Log Your Daily Exercise")
-st.info("💡 Type your activity in any language (e.g., '30 min morning jogging' or '45 min gym kiya')")
-act_text = st.text_input("What was your workout?")
-if st.button("Calculate Burned Calories"):
-    if act_text:
-        with st.spinner("Calculating..."):
-            act_prompt = f"User did this activity: '{act_text}'. Estimate calories burned for an average 70kg male. Return ONLY valid JSON with keys: 'activity_name', 'calories_burned' (integer). No markdown."
-            response = model.generate_content(act_prompt)
-            try:
-                act_res = json.loads(response.text.replace('```json', '').replace('```', '').strip())
-                st.success(f"Burned {act_res['calories_burned']} kcal from {act_res['activity_name']}")
-                if st.button("Save Workout"):
-                    day['calories_burned'] += int(act_res['calories_burned'])
-                    day['activity'].append(f"🏃 {act_res['activity_name']} (-{act_res['calories_burned']} kcal)")
-                    save_data(data); st.rerun()
-            except:
-                st.error("Error reading workout data.")
-                
-if len(day['activity']) > 0:
-    for act in day['activity']:
-        st.write(act)
-st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.subheader("🎯 Set Your Daily Targets")
+    t_cal = st.number_input("Target Calories", value=profile.get("target_cals", 2200), step=100)
+    t_p = st.number_input("Target Protein (g)", value=profile.get("target_p", 120), step=5)
+    t_c = st.number_input("Target Carbs (g)", value=profile.get("target_c", 250), step=5)
+    t_f = st.number_input("Target Fat (g)", value=profile.get("target_f", 60), step=5)
+    
+    if st.button("Save Profile & Targets"):
+        profile["height_cm"] = h_cm
+        profile["weight_kg"] = w_kg
+        profile["target_cals"] = t_cal
+        profile["target_p"] = t_p
+        profile["target_c"] = t_c
+        profile["target_f"] = t_f
+        save_data(data)
+        st.success("Profile saved successfully!")
+        st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
