@@ -10,58 +10,53 @@ st.set_page_config(page_title="ZenCalorie AI", page_icon="🍏", layout="centere
 
 st.markdown("""
 <style>
-    .stApp { background-color: #EDF3EA; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
-    .cal-strip {
-        background: white; border-radius: 20px; padding: 14px 10px;
-        display: flex; justify-content: space-around; align-items: center;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.03); margin-bottom: 14px; text-align: center;
-    }
-    .cal-day { font-size: 13px; color: #7A867A; font-weight: 600; }
-    .cal-num { font-size: 15px; color: #2C352C; font-weight: 600; margin-top: 6px; padding: 6px 10px; border-radius: 50%; }
-    .cal-active { background-color: #558B2F; color: white !important; }
-    
-    .summary-pill {
-        background: white; border-radius: 16px; padding: 14px 18px;
-        display: flex; justify-content: space-between; align-items: center;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.03); margin-bottom: 10px;
-    }
-    .pill-title { font-size: 16px; font-weight: 600; color: #2C352C; }
-    .pill-val { font-size: 15px; font-weight: 700; color: #386624; }
-    
-    .meal-card {
-        background: white; border-radius: 20px; padding: 18px;
-        box-shadow: 0 3px 10px rgba(0,0,0,0.04); margin-bottom: 16px;
-    }
-    .meal-title { font-size: 17px; font-weight: 700; color: #1C241C; margin-bottom: 2px; }
-    .meal-sub { font-size: 13px; color: #7A867A; margin-bottom: 12px; }
-    
-    .ing-title { font-size: 15px; font-weight: 700; color: #1C241C; margin-top: 10px; margin-bottom: 6px; }
-    .chip-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
-    .chip { background: #F1F6EE; padding: 4px 12px; border-radius: 10px; font-size: 12px; font-weight: 600; color: #2C352C; }
-    
-    .macro-grid {
-        display: flex; justify-content: space-around; text-align: center;
-        border-top: 1px solid #F0F3EF; padding-top: 12px; margin-top: 8px;
-    }
-    .m-label { font-size: 10px; color: #7A867A; font-weight: 700; letter-spacing: 0.5px; }
-    .m-cal { font-size: 18px; font-weight: 800; color: #558B2F; }
-    .m-carb { font-size: 18px; font-weight: 800; color: #1E88E5; }
-    .m-pro { font-size: 18px; font-weight: 800; color: #8E24AA; }
-    .m-fat { font-size: 18px; font-weight: 800; color: #FB8C00; }
-    .m-pct { font-size: 11px; color: #7A867A; margin-top: 2px; }
-    .time-stamp { font-size: 12px; color: #7A867A; margin-top: 10px; }
+.stApp { background-color: #EDF3EA; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+.cal-strip {
+    background: white; border-radius: 20px; padding: 14px 10px;
+    display: flex; justify-content: space-around; align-items: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.03); margin-bottom: 14px; text-align: center;
+}
+.cal-day { font-size: 13px; color: #7A867A; font-weight: 600; }
+.cal-num { font-size: 15px; color: #2C352C; font-weight: 600; margin-top: 6px; padding: 6px 10px; border-radius: 50%; }
+.cal-active { background-color: #558B2F; color: white !important; }
+.summary-pill {
+    background: white; border-radius: 16px; padding: 14px 18px;
+    display: flex; justify-content: space-between; align-items: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.03); margin-bottom: 10px;
+}
+.pill-title { font-size: 16px; font-weight: 600; color: #2C352C; }
+.pill-val { font-size: 15px; font-weight: 700; color: #386624; }
+.meal-card {
+    background: white; border-radius: 20px; padding: 18px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.04); margin-bottom: 16px;
+}
+.meal-title { font-size: 17px; font-weight: 700; color: #1C241C; margin-bottom: 2px; }
+.meal-sub { font-size: 13px; color: #7A867A; margin-bottom: 12px; }
+.ing-title { font-size: 15px; font-weight: 700; color: #1C241C; margin-top: 10px; margin-bottom: 6px; }
+.chip-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.chip { background: #F1F6EE; padding: 4px 12px; border-radius: 10px; font-size: 12px; font-weight: 600; color: #2C352C; }
+.macro-grid {
+    display: flex; justify-content: space-around; text-align: center;
+    border-top: 1px solid #F0F3EF; padding-top: 12px; margin-top: 8px;
+}
+.m-label { font-size: 10px; color: #7A867A; font-weight: 700; letter-spacing: 0.5px; }
+.m-cal { font-size: 18px; font-weight: 800; color: #558B2F; }
+.m-carb { font-size: 18px; font-weight: 800; color: #1E88E5; }
+.m-pro { font-size: 18px; font-weight: 800; color: #8E24AA; }
+.m-fat { font-size: 18px; font-weight: 800; color: #FB8C00; }
+.m-pct { font-size: 11px; color: #7A867A; margin-top: 2px; }
+.time-stamp { font-size: 12px; color: #7A867A; margin-top: 10px; }
 </style>
 """, unsafe_allow_html=True)
 
-# ================= 2. BULLETPROOF GEMINI MODEL LOADER =================
+# ================= 2. GEMINI MODEL LOADER =================
 @st.cache_resource
 def init_gemini():
     api_key = st.secrets.get("GEMINI_API_KEY", "")
     if not api_key:
         return None
     genai.configure(api_key=api_key)
-    # Try current 2026 models first, then automatically detect any valid model on your key
-    preferred = ["gemini-flash-latest", "gemini-3.5-flash", "gemini-3.8-flash", "gemini-2.5-flash"]
+    preferred = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash"]
     try:
         available = [
             m.name.replace("models/", "")
@@ -79,7 +74,51 @@ def init_gemini():
 
 model = init_gemini()
 
-# ================= 3. BUILT-IN INDIAN / ODIA / SOUTH INDIAN FOOD DATABASE =================
+# ================= 3. AUTO-TARGET CALCULATOR FUNCTION =================
+def calculate_smart_targets(age, gender, height_cm, current_kg, target_kg, activity_level):
+    # Mifflin-St Jeor BMR Formula
+    if gender == "Male":
+        bmr = (10 * current_kg) + (6.25 * height_cm) - (5 * age) + 5
+    else:
+        bmr = (10 * current_kg) + (6.25 * height_cm) - (5 * age) - 161
+
+    multipliers = {
+        "Sedentary (Desk job, little exercise)": 1.2,
+        "Lightly Active (Morning walk/jog 1-3 km)": 1.375,
+        "Moderately Active (Daily run/workout 3-5 days/wk)": 1.55,
+        "Very Active (Hard training 6-7 days/wk)": 1.725
+    }
+    tdee = bmr * multipliers.get(activity_level, 1.375)
+
+    # Adjust calories for Weight Loss, Maintenance, or Muscle Gain
+    diff = target_kg - current_kg
+    if diff < -0.5:
+        target_cals = int(max(tdee - 450, 1300))  # Safe fat-loss deficit
+        protein_g = int(current_kg * 1.8)         # High protein to protect muscle
+    elif diff > 0.5:
+        target_cals = int(tdee + 350)             # Lean bulk surplus
+        protein_g = int(current_kg * 1.7)
+    else:
+        target_cals = int(tdee)                   # Maintenance
+        protein_g = int(current_kg * 1.5)
+
+    fat_g = int((target_cals * 0.25) / 9)
+    rem_cals = max(target_cals - (protein_g * 4) - (fat_g * 9), 200)
+    carbs_g = int(rem_cals / 4)
+
+    # Water intake: 35ml per kg of body weight + 300ml for active lifestyle
+    water_ml = int((current_kg * 35) + (300 if "Active" in activity_level else 0))
+    water_ml = round(water_ml / 100) * 100
+
+    return {
+        "target_cals": target_cals,
+        "target_p": protein_g,
+        "target_c": carbs_g,
+        "target_f": fat_g,
+        "water_goal": water_ml
+    }
+
+# ================= 4. BUILT-IN INDIAN / ODIA / SOUTH INDIAN FOOD DATABASE =================
 FOOD_DB = {
     "Chia Seeds with Lemon Water (250ml)": {"cal": 78, "c": 7, "p": 3, "f": 5, "items": [{"n": "Chia seeds (15g)", "cal": 73, "c": 6, "p": 3, "f": 5}, {"n": "Lemon water (250ml)", "cal": 5, "c": 1, "p": 0, "f": 0}]},
     "Steamed White Rice (1 Bowl / 150g)": {"cal": 195, "c": 42, "p": 4, "f": 0, "items": [{"n": "Boiled Rice (150g)", "cal": 195, "c": 42, "p": 4, "f": 0}]},
@@ -103,15 +142,25 @@ FOOD_DB = {
     "Morning Running (3 km / 20 mins)": {"cal": -210, "c": 0, "p": 0, "f": 0, "is_exercise": True, "items": []}
 }
 
-# ================= 4. DATA STORAGE =================
+# ================= 5. DATA STORAGE =================
 DATA_FILE = "zentrack_v2.json"
 TODAY = str(date.today())
 
 def load_data():
-    default = {
-        "profile": {"height_cm": 170.0, "weight_kg": 70.0, "target_cals": 2077, "target_c": 260, "target_p": 110, "target_f": 65, "water_goal": 2500},
-        "days": {}
+    default_prof = {
+        "age": 29,
+        "gender": "Male",
+        "height_cm": 170.0,
+        "weight_kg": 72.0,
+        "target_weight_kg": 66.0,
+        "activity_level": "Lightly Active (Morning walk/jog 1-3 km)",
+        "target_cals": 1820,
+        "target_c": 205,
+        "target_p": 130,
+        "target_f": 50,
+        "water_goal": 2800
     }
+    default = {"profile": default_prof, "days": {}}
     if os.path.exists(DATA_FILE):
         try:
             with open(DATA_FILE, "r") as f:
@@ -122,7 +171,12 @@ def load_data():
         data = default
 
     if "profile" not in data:
-        data["profile"] = default["profile"]
+        data["profile"] = default_prof
+    else:
+        for k, v in default_prof.items():
+            if k not in data["profile"]:
+                data["profile"][k] = v
+
     if "days" not in data:
         data["days"] = {}
     if TODAY not in data["days"]:
@@ -145,10 +199,9 @@ tot_c = sum(e.get("c", 0) for e in day_log["entries"])
 tot_p = sum(e.get("p", 0) for e in day_log["entries"])
 tot_f = sum(e.get("f", 0) for e in day_log["entries"])
 
-# ================= 5. TOP NAVIGATION & ZENCALORIE CALENDAR STRIP =================
+# ================= 6. TOP NAVIGATION & ZENCALORIE CALENDAR STRIP =================
 st.markdown("<h3 style='text-align:center; color:#1C241C; margin-bottom:8px;'>Today ⌄</h3>", unsafe_allow_html=True)
 
-# Generate Current Week (Monday - Sunday)
 today_dt = date.today()
 start_week = today_dt - timedelta(days=today_dt.weekday())
 days_letters = ["M", "T", "W", "T", "F", "S", "S"]
@@ -160,72 +213,69 @@ for i in range(7):
 cal_html += '</div>'
 st.markdown(cal_html, unsafe_allow_html=True)
 
-# Summary Pills (Exactly like Zencalorie)
-st.markdown(f"""
-<div class="summary-pill">
-    <span class="pill-title">🔥 Calories</span>
-    <span class="pill-val">{net_cal} / {prof['target_cals']:,} kcal  ⌄</span>
-</div>
-<div class="summary-pill">
-    <span class="pill-title">📊 Macros</span>
-    <span class="pill-val">
-        <span style="color:#1E88E5;">C {tot_c}g</span> &nbsp;
-        <span style="color:#8E24AA;">P {tot_p}g</span> &nbsp;
-        <span style="color:#FB8C00;">F {tot_f}g</span> &nbsp;⌄
-    </span>
-</div>
-""", unsafe_allow_html=True)
+# Summary Pills
+st.markdown(
+    f'<div class="summary-pill"><span class="pill-title">🔥 Calories</span><span class="pill-val">{net_cal} / {prof["target_cals"]:,} kcal ⌄</span></div>'
+    f'<div class="summary-pill"><span class="pill-title">📊 Macros</span><span class="pill-val">'
+    f'<span style="color:#1E88E5;">C {tot_c}/{prof["target_c"]}g</span> &nbsp;'
+    f'<span style="color:#8E24AA;">P {tot_p}/{prof["target_p"]}g</span> &nbsp;'
+    f'<span style="color:#FB8C00;">F {tot_f}/{prof["target_f"]}g</span> ⌄</span></div>',
+    unsafe_allow_html=True
+)
 
-# ================= 6. MAIN TABS =================
-tab_feed, tab_add, tab_water, tab_prof = st.tabs(["📋 Activity Feed", "➕ Log Food / Exercise", "💧 Water", "⚙️ BMI & Goals"])
+# ================= 7. MAIN TABS =================
+tab_feed, tab_add, tab_water, tab_prof = st.tabs(["📋 Activity Feed", "➕ Log Food / Exercise", "💧 Water", "⚙️ BMI & Auto-Goals"])
 
-# ----------------- TAB 1: ZENCALORIE FEED -----------------
+# ----------------- TAB 1: ZENCALORIE FEED (NO INDENTATION BUG) -----------------
 with tab_feed:
     st.markdown("<h4 style='color:#2E5A1C; margin-top:5px;'>Activity</h4>", unsafe_allow_html=True)
     if not day_log["entries"]:
         st.info("No meals or workouts logged yet today. Tap '➕ Log Food / Exercise' above to add your first entry!")
     else:
-        for idx, entry in enumerate(reversed(day_log["entries"])):
+        for entry in reversed(day_log["entries"]):
             if entry.get("is_exercise", False):
-                st.markdown(f"""
-                <div class="meal-card">
-                    <div class="meal-title">🏃‍♂️ {entry['title']}</div>
-                    <div class="meal-sub">{entry.get('subtitle', 'Daily Workout')}</div>
-                    <div style="font-size:20px; font-weight:800; color:#558B2F;">🔥 {abs(entry['cal'])} Calories Burned</div>
-                    <div class="time-stamp">{entry.get('time', '')}</div>
-                </div>
-                """, unsafe_allow_html=True)
+                card_html = (
+                    f'<div class="meal-card">'
+                    f'<div class="meal-title">🏃‍♂️ {entry["title"]}</div>'
+                    f'<div class="meal-sub">{entry.get("subtitle", "Daily Workout")}</div>'
+                    f'<div style="font-size:20px; font-weight:800; color:#558B2F;">🔥 {abs(entry["cal"])} Calories Burned</div>'
+                    f'<div class="time-stamp">{entry.get("time", "")}</div>'
+                    f'</div>'
+                )
+                st.markdown(card_html, unsafe_allow_html=True)
             else:
-                ing_html = ""
+                ing_parts = []
                 for item in entry.get("items", []):
-                    ing_html += f"""
-                    <div class="ing-title">{item['n']}</div>
-                    <div class="chip-row">
-                        <span class="chip">Calories: {item['cal']}</span>
-                        <span class="chip">C: {item['c']}g</span>
-                        <span class="chip">P: {item['p']}g</span>
-                        <span class="chip">F: {item['f']}g</span>
-                    </div>
-                    """
-                c_pct = int((entry['cal'] / max(prof['target_cals'], 1)) * 100)
-                carb_pct = int((entry['c'] / max(prof['target_c'], 1)) * 100)
-                pro_pct = int((entry['p'] / max(prof['target_p'], 1)) * 100)
-                fat_pct = int((entry['f'] / max(prof['target_f'], 1)) * 100)
+                    ing_parts.append(
+                        f'<div class="ing-title">{item["n"]}</div>'
+                        f'<div class="chip-row">'
+                        f'<span class="chip">Calories: {item["cal"]}</span>'
+                        f'<span class="chip">C: {item["c"]}g</span>'
+                        f'<span class="chip">P: {item["p"]}g</span>'
+                        f'<span class="chip">F: {item["f"]}g</span>'
+                        f'</div>'
+                    )
+                ing_html = "".join(ing_parts)
+                c_pct = int((entry["cal"] / max(prof["target_cals"], 1)) * 100)
+                carb_pct = int((entry["c"] / max(prof["target_c"], 1)) * 100)
+                pro_pct = int((entry["p"] / max(prof["target_p"], 1)) * 100)
+                fat_pct = int((entry["f"] / max(prof["target_f"], 1)) * 100)
 
-                st.markdown(f"""
-                <div class="meal-card">
-                    <div class="meal-title">{entry['title']}</div>
-                    <div class="meal-sub">{entry.get('subtitle', entry['title'])}</div>
-                    {ing_html}
-                    <div class="macro-grid">
-                        <div><div class="m-label">CALORIES</div><div class="m-cal">{entry['cal']}</div><div class="m-pct">{c_pct}%</div></div>
-                        <div><div class="m-label">CARBS</div><div class="m-carb">{entry['c']}g</div><div class="m-pct">{carb_pct}%</div></div>
-                        <div><div class="m-label">PROTEIN</div><div class="m-pro">{entry['p']}g</div><div class="m-pct">{pro_pct}%</div></div>
-                        <div><div class="m-label">FAT</div><div class="m-fat">{entry['f']}g</div><div class="m-pct">{fat_pct}%</div></div>
-                    </div>
-                    <div class="time-stamp">{entry.get('time', '')}</div>
-                </div>
-                """, unsafe_allow_html=True)
+                card_html = (
+                    f'<div class="meal-card">'
+                    f'<div class="meal-title">{entry["title"]}</div>'
+                    f'<div class="meal-sub">{entry.get("subtitle", entry["title"])}</div>'
+                    f'{ing_html}'
+                    f'<div class="macro-grid">'
+                    f'<div><div class="m-label">CALORIES</div><div class="m-cal">{entry["cal"]}</div><div class="m-pct">{c_pct}%</div></div>'
+                    f'<div><div class="m-label">CARBS</div><div class="m-carb">{entry["c"]}g</div><div class="m-pct">{carb_pct}%</div></div>'
+                    f'<div><div class="m-label">PROTEIN</div><div class="m-pro">{entry["p"]}g</div><div class="m-pct">{pro_pct}%</div></div>'
+                    f'<div><div class="m-label">FAT</div><div class="m-fat">{entry["f"]}g</div><div class="m-pct">{fat_pct}%</div></div>'
+                    f'</div>'
+                    f'<div class="time-stamp">{entry.get("time", "")}</div>'
+                    f'</div>'
+                )
+                st.markdown(card_html, unsafe_allow_html=True)
 
         if st.button("🗑️ Clear Today's Log"):
             day_log["entries"] = []
@@ -236,11 +286,10 @@ with tab_feed:
 with tab_add:
     sub1, sub2, sub3 = st.tabs(["🔍 Database Search", "✨ AI Text (Hindi/Odia/Eng)", "📷 Camera / Gallery"])
 
-    # 1. Instant Database Auto-Suggest
     with sub1:
         st.caption("Start typing to get instant suggestions from the Indian, Odia & South Indian database:")
         selected_food = st.selectbox("Search Food or Exercise Database", options=[""] + list(FOOD_DB.keys()))
-        qty = st.slider("Portion Multiplier (Servings)", 0.5, 4.0, 1.0, 0.5)
+        qty = st.slider("Portion Multiplier (Servings)", 0.5, 5.0, 1.0, 0.5)
 
         if selected_food:
             item_data = FOOD_DB[selected_food]
@@ -267,7 +316,6 @@ with tab_add:
                 st.success("Added! Check your Activity Feed.")
                 st.rerun()
 
-    # 2. AI Text Bar (Like Zencalorie "What did you eat or exercise?")
     with sub2:
         st.caption("Type in Hindi, Odia, Hinglish, or English (e.g., '1 bowl dalma, 1 cup rice and 2 boiled eggs' or '20 min morning running')")
         user_query = st.text_input("What did you eat or exercise?")
@@ -290,8 +338,7 @@ with tab_add:
                       "f": 8,
                       "is_exercise": false,
                       "items": [
-                        {{"n": "Ingredient 1 (weight)", "cal": 150, "c": 20, "p": 8, "f": 5}},
-                        {{"n": "Ingredient 2 (weight)", "cal": 100, "c": 10, "p": 4, "f": 3}}
+                        {{"n": "Ingredient 1 (weight)", "cal": 150, "c": 20, "p": 8, "f": 5}}
                       ]
                     }}
                     If it is an exercise/workout, set "is_exercise": true, "c": 0, "p": 0, "f": 0, and "cal" to positive calories burned.
@@ -313,7 +360,6 @@ with tab_add:
                 del st.session_state["ai_draft"]
                 st.rerun()
 
-    # 3. Camera / Gallery Photo Scanner (Toggle-Protected)
     with sub3:
         cam_mode = st.radio("Choose Image Source", ["Upload from Gallery", "Turn On Camera"], horizontal=True)
         img_file = None
@@ -364,25 +410,62 @@ with tab_water:
         day_log["water_ml"] = 0; save_data(data); st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ----------------- TAB 4: BMI & DAILY GOALS -----------------
+# ----------------- TAB 4: BMI & AUTO-CALCULATED TARGETS -----------------
 with tab_prof:
     st.markdown('<div class="meal-card">', unsafe_allow_html=True)
-    st.subheader("⚖️ BMI Calculator & Daily Targets")
-    c1, c2 = st.columns(2)
-    h = c1.number_input("Height (cm)", 100.0, 230.0, float(prof["height_cm"]))
-    w = c2.number_input("Weight (kg)", 30.0, 200.0, float(prof["weight_kg"]))
-    bmi = w / ((h / 100) ** 2)
-    st.write(f"**Your BMI:** `{bmi:.1f}` ({'Normal' if 18.5 <= bmi <= 24.9 else 'Adjust Target'})")
+    st.subheader("⚖️ Body Details & Automatic Goal Planner")
+    st.caption("Enter your body details below—the app will automatically calculate your daily Calories, Protein, Carbs, Fat, and Water targets.")
 
-    t_cal = st.number_input("Daily Calorie Target (kcal)", 1000, 4500, int(prof["target_cals"]), step=50)
-    mc1, mc2, mc3 = st.columns(3)
-    tc = mc1.number_input("Carbs (g)", 50, 500, int(prof["target_c"]))
-    tp = mc2.number_input("Protein (g)", 30, 300, int(prof["target_p"]))
-    tf = mc3.number_input("Fat (g)", 20, 200, int(prof["target_f"]))
+    col_a, col_g = st.columns(2)
+    age = col_a.number_input("Age (Years)", 15, 90, int(prof.get("age", 29)))
+    gender = col_g.selectbox("Gender", ["Male", "Female"], index=0 if prof.get("gender", "Male") == "Male" else 1)
 
-    if st.button("💾 Save Targets"):
-        prof.update({"height_cm": h, "weight_kg": w, "target_cals": t_cal, "target_c": tc, "target_p": tp, "target_f": tf})
+    col_h, col_cw, col_tw = st.columns(3)
+    h = col_h.number_input("Height (cm)", 120.0, 230.0, float(prof.get("height_cm", 170.0)), step=0.5)
+    cw = col_cw.number_input("Current Weight (kg)", 30.0, 200.0, float(prof.get("weight_kg", 72.0)), step=0.5)
+    tw = col_tw.number_input("Target Weight (kg)", 30.0, 200.0, float(prof.get("target_weight_kg", 66.0)), step=0.5)
+
+    act_options = [
+        "Sedentary (Desk job, little exercise)",
+        "Lightly Active (Morning walk/jog 1-3 km)",
+        "Moderately Active (Daily run/workout 3-5 days/wk)",
+        "Very Active (Hard training 6-7 days/wk)"
+    ]
+    saved_act = prof.get("activity_level", act_options[1])
+    act_idx = act_options.index(saved_act) if saved_act in act_options else 1
+    act_level = st.selectbox("Daily Activity Level", act_options, index=act_idx)
+
+    # Calculate BMI & Smart Plan Preview Live
+    bmi = cw / ((h / 100) ** 2)
+    bmi_status = "Normal Weight ✅" if 18.5 <= bmi <= 24.9 else ("Overweight ⚠️" if bmi > 24.9 else "Underweight ℹ️")
+    auto_plan = calculate_smart_targets(age, gender, h, cw, tw, act_level)
+
+    weight_diff = tw - cw
+    goal_label = f"Lose {abs(weight_diff):.1f} kg" if weight_diff < -0.5 else (f"Gain {weight_diff:.1f} kg" if weight_diff > 0.5 else "Maintain Weight")
+
+    st.info(
+        f"**Current BMI:** `{bmi:.1f}` ({bmi_status}) | **Goal:** `{goal_label}`\n\n"
+        f"**Recommended Daily Plan:**\n"
+        f"- 🔥 **Calories:** `{auto_plan['target_cals']} kcal/day`\n"
+        f"- 💪 **Protein:** `{auto_plan['target_p']} g` | 🍚 **Carbs:** `{auto_plan['target_c']} g` | 🥑 **Fat:** `{auto_plan['target_f']} g`\n"
+        f"- 💧 **Daily Water Goal:** `{auto_plan['water_goal']} ml` ({auto_plan['water_goal']/1000:.1f} Liters)"
+    )
+
+    if st.button("✨ Auto-Set & Save My Daily Targets"):
+        prof.update({
+            "age": age,
+            "gender": gender,
+            "height_cm": h,
+            "weight_kg": cw,
+            "target_weight_kg": tw,
+            "activity_level": act_level,
+            "target_cals": auto_plan["target_cals"],
+            "target_p": auto_plan["target_p"],
+            "target_c": auto_plan["target_c"],
+            "target_f": auto_plan["target_f"],
+            "water_goal": auto_plan["water_goal"]
+        })
         save_data(data)
-        st.success("Targets updated!")
+        st.success("Your personalized calorie, macro, and water targets have been updated!")
         st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
