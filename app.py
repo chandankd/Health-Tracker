@@ -2,204 +2,387 @@ import streamlit as st
 import google.generativeai as genai
 import json
 import os
-from datetime import date
+from datetime import date, datetime, timedelta
 from PIL import Image
 
-# 1. Page Configuration & Custom CSS (Green/White Zencalorie Theme)
-st.set_page_config(page_title="ZenTrack AI", page_icon="🍏", layout="centered")
+# ================= 1. PAGE CONFIG & ZENCALORIE EXACT CSS =================
+st.set_page_config(page_title="ZenCalorie AI", page_icon="🍏", layout="centered")
 
 st.markdown("""
-    <style>
-    .stApp { background-color: #F4F7F4; }
-    .card {
-        background-color: white; padding: 20px; border-radius: 15px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px;
-        border-left: 5px solid #4CAF50;
+<style>
+    .stApp { background-color: #EDF3EA; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+    .cal-strip {
+        background: white; border-radius: 20px; padding: 14px 10px;
+        display: flex; justify-content: space-around; align-items: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.03); margin-bottom: 14px; text-align: center;
     }
-    .macro-text { font-size: 14px; color: #555; margin-bottom: 2px; }
-    .macro-val { font-size: 18px; font-weight: bold; color: #333; }
-    .stTabs [data-baseweb="tab-list"] { gap: 10px; justify-content: center; }
-    </style>
+    .cal-day { font-size: 13px; color: #7A867A; font-weight: 600; }
+    .cal-num { font-size: 15px; color: #2C352C; font-weight: 600; margin-top: 6px; padding: 6px 10px; border-radius: 50%; }
+    .cal-active { background-color: #558B2F; color: white !important; }
+    
+    .summary-pill {
+        background: white; border-radius: 16px; padding: 14px 18px;
+        display: flex; justify-content: space-between; align-items: center;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.03); margin-bottom: 10px;
+    }
+    .pill-title { font-size: 16px; font-weight: 600; color: #2C352C; }
+    .pill-val { font-size: 15px; font-weight: 700; color: #386624; }
+    
+    .meal-card {
+        background: white; border-radius: 20px; padding: 18px;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.04); margin-bottom: 16px;
+    }
+    .meal-title { font-size: 17px; font-weight: 700; color: #1C241C; margin-bottom: 2px; }
+    .meal-sub { font-size: 13px; color: #7A867A; margin-bottom: 12px; }
+    
+    .ing-title { font-size: 15px; font-weight: 700; color: #1C241C; margin-top: 10px; margin-bottom: 6px; }
+    .chip-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+    .chip { background: #F1F6EE; padding: 4px 12px; border-radius: 10px; font-size: 12px; font-weight: 600; color: #2C352C; }
+    
+    .macro-grid {
+        display: flex; justify-content: space-around; text-align: center;
+        border-top: 1px solid #F0F3EF; padding-top: 12px; margin-top: 8px;
+    }
+    .m-label { font-size: 10px; color: #7A867A; font-weight: 700; letter-spacing: 0.5px; }
+    .m-cal { font-size: 18px; font-weight: 800; color: #558B2F; }
+    .m-carb { font-size: 18px; font-weight: 800; color: #1E88E5; }
+    .m-pro { font-size: 18px; font-weight: 800; color: #8E24AA; }
+    .m-fat { font-size: 18px; font-weight: 800; color: #FB8C00; }
+    .m-pct { font-size: 11px; color: #7A867A; margin-top: 2px; }
+    .time-stamp { font-size: 12px; color: #7A867A; margin-top: 10px; }
+</style>
 """, unsafe_allow_html=True)
 
-# 2. Configure Gemini API
-try:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    model = genai.GenerativeModel('gemini-1.5-flash')
-except KeyError:
-    st.error("⚠️ Gemini API Key missing! Add GEMINI_API_KEY to Streamlit Secrets.")
+# ================= 2. BULLETPROOF GEMINI MODEL LOADER =================
+@st.cache_resource
+def init_gemini():
+    api_key = st.secrets.get("GEMINI_API_KEY", "")
+    if not api_key:
+        return None
+    genai.configure(api_key=api_key)
+    # Try current 2026 models first, then automatically detect any valid model on your key
+    preferred = ["gemini-flash-latest", "gemini-3.5-flash", "gemini-3.8-flash", "gemini-2.5-flash"]
+    try:
+        available = [
+            m.name.replace("models/", "")
+            for m in genai.list_models()
+            if "generateContent" in m.supported_generation_methods
+        ]
+        for p in preferred:
+            if p in available:
+                return genai.GenerativeModel(p)
+        if available:
+            return genai.GenerativeModel(available[0])
+    except Exception:
+        pass
+    return genai.GenerativeModel("gemini-flash-latest")
 
-# 3. Data Storage (Including Profile for BMI & Targets)
-DATA_FILE = "zentrack_data.json"
+model = init_gemini()
+
+# ================= 3. BUILT-IN INDIAN / ODIA / SOUTH INDIAN FOOD DATABASE =================
+FOOD_DB = {
+    "Chia Seeds with Lemon Water (250ml)": {"cal": 78, "c": 7, "p": 3, "f": 5, "items": [{"n": "Chia seeds (15g)", "cal": 73, "c": 6, "p": 3, "f": 5}, {"n": "Lemon water (250ml)", "cal": 5, "c": 1, "p": 0, "f": 0}]},
+    "Steamed White Rice (1 Bowl / 150g)": {"cal": 195, "c": 42, "p": 4, "f": 0, "items": [{"n": "Boiled Rice (150g)", "cal": 195, "c": 42, "p": 4, "f": 0}]},
+    "Odia Dalma (1 Bowl / 200g)": {"cal": 185, "c": 24, "p": 9, "f": 6, "items": [{"n": "Toor Dal & Mixed Veggies (200g)", "cal": 150, "c": 24, "p": 9, "f": 2}, {"n": "Mustard Oil & Tadka (4g)", "cal": 35, "c": 0, "p": 0, "f": 4}]},
+    "Pakhala Bhata (1 Bowl / 300g)": {"cal": 210, "c": 45, "p": 4, "f": 1, "items": [{"n": "Fermented Rice & Water (280g)", "cal": 195, "c": 44, "p": 4, "f": 0}, {"n": "Curd & Seasoning (20g)", "cal": 15, "c": 1, "p": 0, "f": 1}]},
+    "Odia Saga Bhaja (1 Katori / 100g)": {"cal": 85, "c": 8, "p": 3, "f": 5, "items": [{"n": "Leafy Greens & Garlic (100g)", "cal": 85, "c": 8, "p": 3, "f": 5}]},
+    "Chhena Poda (1 Piece / 60g)": {"cal": 190, "c": 22, "p": 7, "f": 8, "items": [{"n": "Baked Cottage Cheese & Sugar (60g)", "cal": 190, "c": 22, "p": 7, "f": 8}]},
+    "Boiled Eggs (2 Whole Eggs)": {"cal": 155, "c": 1, "p": 13, "f": 11, "items": [{"n": "Boiled Eggs (100g)", "cal": 155, "c": 1, "p": 13, "f": 11}]},
+    "Oats Porridge with Milk (1 Bowl / 250g)": {"cal": 225, "c": 34, "p": 9, "f": 6, "items": [{"n": "Rolled Oats (40g)", "cal": 150, "c": 27, "p": 5, "f": 3}, {"n": "Milk (120ml)", "cal": 75, "c": 7, "p": 4, "f": 3}]},
+    "Soya Chunks Curry / Dry (1 Bowl / 50g raw)": {"cal": 215, "c": 17, "p": 26, "f": 4, "items": [{"n": "Soya Chunks (50g dry weight)", "cal": 172, "c": 16, "p": 26, "f": 1}, {"n": "Spices & Oil", "cal": 43, "c": 1, "p": 0, "f": 3}]},
+    "Plain Curd / Dahi (1 Katori / 100g)": {"cal": 60, "c": 4, "p": 3, "f": 3, "items": [{"n": "Fresh Curd (100g)", "cal": 60, "c": 4, "p": 3, "f": 3}]},
+    "Toor Dal / Yellow Dal Tadka (1 Bowl / 150g)": {"cal": 165, "c": 20, "p": 8, "f": 6, "items": [{"n": "Cooked Yellow Dal (150g)", "cal": 165, "c": 20, "p": 8, "f": 6}]},
+    "Roti / Chapati (2 Pieces)": {"cal": 170, "c": 34, "p": 6, "f": 1, "items": [{"n": "Whole Wheat Roti (2 pcs)", "cal": 170, "c": 34, "p": 6, "f": 1}]},
+    "South Indian Idli (2 Pieces with Sambar)": {"cal": 190, "c": 36, "p": 6, "f": 2, "items": [{"n": "Steamed Idli (2 pcs)", "cal": 130, "c": 28, "p": 4, "f": 0}, {"n": "Sambar (100ml)", "cal": 60, "c": 8, "p": 2, "f": 2}]},
+    "Masala Dosa (1 Medium with Chutney)": {"cal": 320, "c": 45, "p": 7, "f": 12, "items": [{"n": "Dosa with Potato Masala (150g)", "cal": 260, "c": 42, "p": 5, "f": 8}, {"n": "Coconut Chutney (30g)", "cal": 60, "c": 3, "p": 2, "f": 4}]},
+    "Upma (1 Bowl / 150g)": {"cal": 195, "c": 32, "p": 5, "f": 5, "items": [{"n": "Rava Upma with Veggies (150g)", "cal": 195, "c": 32, "p": 5, "f": 5}]},
+    "Home Style Chicken Curry (1 Bowl / 200g)": {"cal": 280, "c": 6, "p": 28, "f": 16, "items": [{"n": "Chicken Pieces (120g)", "cal": 190, "c": 0, "p": 27, "f": 9}, {"n": "Onion Tomato Gravy (80g)", "cal": 90, "c": 6, "p": 1, "f": 7}]},
+    "Fish Besara / Mustard Fish Curry (1 Bowl)": {"cal": 240, "c": 4, "p": 22, "f": 15, "items": [{"n": "Rohu Fish & Mustard Gravy (150g)", "cal": 240, "c": 4, "p": 22, "f": 15}]},
+    "Grape Juice (1 Glass / 250ml)": {"cal": 150, "c": 37, "p": 1, "f": 0, "items": [{"n": "Grape juice (250ml)", "cal": 150, "c": 37, "p": 1, "f": 0}]},
+    "Morning Walk / Jogging (1 km / 12 mins)": {"cal": -75, "c": 0, "p": 0, "f": 0, "is_exercise": True, "items": []},
+    "Morning Running (3 km / 20 mins)": {"cal": -210, "c": 0, "p": 0, "f": 0, "is_exercise": True, "items": []}
+}
+
+# ================= 4. DATA STORAGE =================
+DATA_FILE = "zentrack_v2.json"
 TODAY = str(date.today())
 
 def load_data():
-    default_data = {
-        "profile": {"height_cm": 170.0, "weight_kg": 70.0, "target_cals": 2200, "target_p": 120, "target_c": 250, "target_f": 60}
+    default = {
+        "profile": {"height_cm": 170.0, "weight_kg": 70.0, "target_cals": 2077, "target_c": 260, "target_p": 110, "target_f": 65, "water_goal": 2500},
+        "days": {}
     }
     if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "r") as f:
-            data = json.load(f)
-            if "profile" not in data:
-                data["profile"] = default_data["profile"]
-            if TODAY not in data:
-                data[TODAY] = {"calories_in": 0, "calories_burned": 0, "protein": 0, "carbs": 0, "fat": 0, "meals": [], "activity": []}
-            return data
-    default_data[TODAY] = {"calories_in": 0, "calories_burned": 0, "protein": 0, "carbs": 0, "fat": 0, "meals": [], "activity": []}
-    return default_data
+        try:
+            with open(DATA_FILE, "r") as f:
+                data = json.load(f)
+        except Exception:
+            data = default
+    else:
+        data = default
+
+    if "profile" not in data:
+        data["profile"] = default["profile"]
+    if "days" not in data:
+        data["days"] = {}
+    if TODAY not in data["days"]:
+        data["days"][TODAY] = {"water_ml": 0, "entries": []}
+    return data
 
 def save_data(data):
     with open(DATA_FILE, "w") as f:
-        json.dump(data, f)
+        json.dump(data, f, indent=2)
 
 data = load_data()
-day = data[TODAY]
-profile = data["profile"]
-net_calories = day["calories_in"] - day["calories_burned"]
+prof = data["profile"]
+day_log = data["days"][TODAY]
 
-# 4. App Navigation Tabs
-nav1, nav2, nav3, nav4 = st.tabs(["📊 Dashboard", "📸 Log Meal", "🏃‍♂️ Activity", "⚙️ Profile"])
+# Calculate Daily Totals
+tot_cal = sum(e["cal"] for e in day_log["entries"] if not e.get("is_exercise", False))
+tot_burn = sum(abs(e["cal"]) for e in day_log["entries"] if e.get("is_exercise", False))
+net_cal = max(tot_cal - tot_burn, 0)
+tot_c = sum(e.get("c", 0) for e in day_log["entries"])
+tot_p = sum(e.get("p", 0) for e in day_log["entries"])
+tot_f = sum(e.get("f", 0) for e in day_log["entries"])
 
-# ================= DASHBOARD TAB =================
-with nav1:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.subheader(f"Today: {date.today().strftime('%d %b %Y')}")
-    st.write(f"**Eaten:** {day['calories_in']} | **Burned:** {day['calories_burned']} | **Net:** {net_calories} / {profile['target_cals']} kcal")
-    st.progress(min(max(net_calories / profile['target_cals'], 0.0), 1.0))
-    
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown('<p class="macro-text">Protein</p>', unsafe_allow_html=True)
-        st.markdown(f'<p class="macro-val">{day["protein"]}g / {profile["target_p"]}g</p>', unsafe_allow_html=True)
-    with col2:
-        st.markdown('<p class="macro-text">Carbs</p>', unsafe_allow_html=True)
-        st.markdown(f'<p class="macro-val">{day["carbs"]}g / {profile["target_c"]}g</p>', unsafe_allow_html=True)
-    with col3:
-        st.markdown('<p class="macro-text">Fat</p>', unsafe_allow_html=True)
-        st.markdown(f'<p class="macro-val">{day["fat"]}g / {profile["target_f"]}g</p>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.subheader("🍽️ Meals Logged")
-    if not day['meals']:
-        st.write("No meals logged today yet.")
-    for meal in day['meals']:
-        st.write(meal)
-    st.markdown('</div>', unsafe_allow_html=True)
+# ================= 5. TOP NAVIGATION & ZENCALORIE CALENDAR STRIP =================
+st.markdown("<h3 style='text-align:center; color:#1C241C; margin-bottom:8px;'>Today ⌄</h3>", unsafe_allow_html=True)
 
-# ================= LOG MEAL TAB =================
-with nav2:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    log1, log2, log3 = st.tabs(["Just Type", "AI Photo", "Manual"])
-    
-    with log1:
-        st.info("💡 Type in Hindi, English, or Odia (e.g., '1 katori dalma aur 1 cup rice')")
-        food_text = st.text_input("What did you eat?")
-        if st.button("Calculate Text Macros"):
-            if food_text:
-                with st.spinner("Calculating..."):
-                    prompt = f"User said: '{food_text}'. Understand Hindi/Odia/Indian food. Estimate calories and macros. Return ONLY valid JSON with keys: 'food_name', 'calories', 'protein', 'carbs', 'fat' as integers. No markdown."
-                    res_text = model.generate_content(prompt)
+# Generate Current Week (Monday - Sunday)
+today_dt = date.today()
+start_week = today_dt - timedelta(days=today_dt.weekday())
+days_letters = ["M", "T", "W", "T", "F", "S", "S"]
+cal_html = '<div class="cal-strip">'
+for i in range(7):
+    d = start_week + timedelta(days=i)
+    active_cls = "cal-num cal-active" if d == today_dt else "cal-num"
+    cal_html += f'<div><div class="cal-day">{days_letters[i]}</div><div class="{active_cls}">{d.day}</div></div>'
+cal_html += '</div>'
+st.markdown(cal_html, unsafe_allow_html=True)
+
+# Summary Pills (Exactly like Zencalorie)
+st.markdown(f"""
+<div class="summary-pill">
+    <span class="pill-title">🔥 Calories</span>
+    <span class="pill-val">{net_cal} / {prof['target_cals']:,} kcal  ⌄</span>
+</div>
+<div class="summary-pill">
+    <span class="pill-title">📊 Macros</span>
+    <span class="pill-val">
+        <span style="color:#1E88E5;">C {tot_c}g</span> &nbsp;
+        <span style="color:#8E24AA;">P {tot_p}g</span> &nbsp;
+        <span style="color:#FB8C00;">F {tot_f}g</span> &nbsp;⌄
+    </span>
+</div>
+""", unsafe_allow_html=True)
+
+# ================= 6. MAIN TABS =================
+tab_feed, tab_add, tab_water, tab_prof = st.tabs(["📋 Activity Feed", "➕ Log Food / Exercise", "💧 Water", "⚙️ BMI & Goals"])
+
+# ----------------- TAB 1: ZENCALORIE FEED -----------------
+with tab_feed:
+    st.markdown("<h4 style='color:#2E5A1C; margin-top:5px;'>Activity</h4>", unsafe_allow_html=True)
+    if not day_log["entries"]:
+        st.info("No meals or workouts logged yet today. Tap '➕ Log Food / Exercise' above to add your first entry!")
+    else:
+        for idx, entry in enumerate(reversed(day_log["entries"])):
+            if entry.get("is_exercise", False):
+                st.markdown(f"""
+                <div class="meal-card">
+                    <div class="meal-title">🏃‍♂️ {entry['title']}</div>
+                    <div class="meal-sub">{entry.get('subtitle', 'Daily Workout')}</div>
+                    <div style="font-size:20px; font-weight:800; color:#558B2F;">🔥 {abs(entry['cal'])} Calories Burned</div>
+                    <div class="time-stamp">{entry.get('time', '')}</div>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                ing_html = ""
+                for item in entry.get("items", []):
+                    ing_html += f"""
+                    <div class="ing-title">{item['n']}</div>
+                    <div class="chip-row">
+                        <span class="chip">Calories: {item['cal']}</span>
+                        <span class="chip">C: {item['c']}g</span>
+                        <span class="chip">P: {item['p']}g</span>
+                        <span class="chip">F: {item['f']}g</span>
+                    </div>
+                    """
+                c_pct = int((entry['cal'] / max(prof['target_cals'], 1)) * 100)
+                carb_pct = int((entry['c'] / max(prof['target_c'], 1)) * 100)
+                pro_pct = int((entry['p'] / max(prof['target_p'], 1)) * 100)
+                fat_pct = int((entry['f'] / max(prof['target_f'], 1)) * 100)
+
+                st.markdown(f"""
+                <div class="meal-card">
+                    <div class="meal-title">{entry['title']}</div>
+                    <div class="meal-sub">{entry.get('subtitle', entry['title'])}</div>
+                    {ing_html}
+                    <div class="macro-grid">
+                        <div><div class="m-label">CALORIES</div><div class="m-cal">{entry['cal']}</div><div class="m-pct">{c_pct}%</div></div>
+                        <div><div class="m-label">CARBS</div><div class="m-carb">{entry['c']}g</div><div class="m-pct">{carb_pct}%</div></div>
+                        <div><div class="m-label">PROTEIN</div><div class="m-pro">{entry['p']}g</div><div class="m-pct">{pro_pct}%</div></div>
+                        <div><div class="m-label">FAT</div><div class="m-fat">{entry['f']}g</div><div class="m-pct">{fat_pct}%</div></div>
+                    </div>
+                    <div class="time-stamp">{entry.get('time', '')}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+        if st.button("🗑️ Clear Today's Log"):
+            day_log["entries"] = []
+            save_data(data)
+            st.rerun()
+
+# ----------------- TAB 2: LOG FOOD / EXERCISE -----------------
+with tab_add:
+    sub1, sub2, sub3 = st.tabs(["🔍 Database Search", "✨ AI Text (Hindi/Odia/Eng)", "📷 Camera / Gallery"])
+
+    # 1. Instant Database Auto-Suggest
+    with sub1:
+        st.caption("Start typing to get instant suggestions from the Indian, Odia & South Indian database:")
+        selected_food = st.selectbox("Search Food or Exercise Database", options=[""] + list(FOOD_DB.keys()))
+        qty = st.slider("Portion Multiplier (Servings)", 0.5, 4.0, 1.0, 0.5)
+
+        if selected_food:
+            item_data = FOOD_DB[selected_food]
+            s_cal = int(item_data["cal"] * qty)
+            s_c = int(item_data["c"] * qty)
+            s_p = int(item_data["p"] * qty)
+            s_f = int(item_data["f"] * qty)
+
+            st.info(f"**Selected:** {selected_food} (x{qty}) → **{abs(s_cal)} kcal** | C: {s_c}g | P: {s_p}g | F: {s_f}g")
+            if st.button("✅ Add to Today's Log", key="db_add"):
+                scaled_items = [
+                    {"n": i["n"], "cal": int(i["cal"] * qty), "c": int(i["c"] * qty), "p": int(i["p"] * qty), "f": int(i["f"] * qty)}
+                    for i in item_data.get("items", [])
+                ]
+                day_log["entries"].append({
+                    "title": f"{selected_food} (x{qty})" if qty != 1.0 else selected_food,
+                    "subtitle": "Logged from Verified Indian Database",
+                    "cal": s_cal, "c": s_c, "p": s_p, "f": s_f,
+                    "is_exercise": item_data.get("is_exercise", False),
+                    "items": scaled_items,
+                    "time": datetime.now().strftime("%I:%M %p")
+                })
+                save_data(data)
+                st.success("Added! Check your Activity Feed.")
+                st.rerun()
+
+    # 2. AI Text Bar (Like Zencalorie "What did you eat or exercise?")
+    with sub2:
+        st.caption("Type in Hindi, Odia, Hinglish, or English (e.g., '1 bowl dalma, 1 cup rice and 2 boiled eggs' or '20 min morning running')")
+        user_query = st.text_input("What did you eat or exercise?")
+
+        if st.button("✨ Analyze with AI"):
+            if not model:
+                st.error("⚠️ GEMINI_API_KEY missing in Streamlit Secrets!")
+            elif user_query:
+                with st.spinner("Calculating breakdown..."):
+                    prompt = f"""
+                    You are an Indian nutrition & fitness AI. Analyze: "{user_query}".
+                    Understand Hindi, Odia, South Indian, and English food or exercise.
+                    Return ONLY raw JSON (no markdown blocks) in this exact structure:
+                    {{
+                      "title": "Main Dish or Workout Title (with total weight/duration)",
+                      "subtitle": "{user_query}",
+                      "cal": 250,
+                      "c": 30,
+                      "p": 12,
+                      "f": 8,
+                      "is_exercise": false,
+                      "items": [
+                        {{"n": "Ingredient 1 (weight)", "cal": 150, "c": 20, "p": 8, "f": 5}},
+                        {{"n": "Ingredient 2 (weight)", "cal": 100, "c": 10, "p": 4, "f": 3}}
+                      ]
+                    }}
+                    If it is an exercise/workout, set "is_exercise": true, "c": 0, "p": 0, "f": 0, and "cal" to positive calories burned.
+                    """
                     try:
-                        res = json.loads(res_text.text.replace('```json', '').replace('```', '').strip())
-                        st.success(f"Estimated: {res['food_name']} ({res['calories']} kcal)")
-                        if st.button("Save this meal"):
-                            day['calories_in'] += int(res['calories']); day['protein'] += int(res['protein']); day['carbs'] += int(res['carbs']); day['fat'] += int(res['fat'])
-                            day['meals'].append(f"✍️ {res['food_name']} ({res['calories']} kcal)")
-                            save_data(data); st.rerun()
-                    except:
-                        st.error("Error calculating. Please try again.")
+                        resp = model.generate_content(prompt)
+                        clean = resp.text.replace("```json", "").replace("```", "").strip()
+                        st.session_state["ai_draft"] = json.loads(clean)
+                    except Exception as e:
+                        st.error(f"AI Error: {e}")
 
-    with log2:
-        st.warning("🔒 Camera is off to save battery.")
-        # FIX: The camera only turns on when this switch is turned ON.
-        camera_on = st.toggle("📷 Switch on Camera to snap meal")
-        if camera_on:
-            photo = st.camera_input("Take a picture of your food")
-            if photo:
-                with st.spinner("Analyzing AI-Powered Photo..."):
-                    prompt = "Analyze this food image. Identify Indian/Odia dishes if present. Return ONLY valid JSON with keys: 'food_name', 'calories', 'protein', 'carbs', 'fat' as integers. No markdown."
-                    res_text = model.generate_content([prompt, Image.open(photo)])
-                    try:
-                        res = json.loads(res_text.text.replace('```json', '').replace('```', '').strip())
-                        st.success(f"Detected: {res['food_name']} ({res['calories']} kcal)")
-                        if st.button("Save Photo Meal"):
-                            day['calories_in'] += int(res['calories']); day['protein'] += int(res['protein']); day['carbs'] += int(res['carbs']); day['fat'] += int(res['fat'])
-                            day['meals'].append(f"📸 {res['food_name']} ({res['calories']} kcal)")
-                            save_data(data); st.rerun()
-                    except:
-                        st.error("Could not scan clearly.")
+        if "ai_draft" in st.session_state:
+            d = st.session_state["ai_draft"]
+            st.success(f"**{d['title']}** → {d['cal']} kcal | C: {d['c']}g | P: {d['p']}g | F: {d['f']}g")
+            if st.button("💾 Save AI Entry to Today's Log"):
+                d["time"] = datetime.now().strftime("%I:%M %p")
+                day_log["entries"].append(d)
+                save_data(data)
+                del st.session_state["ai_draft"]
+                st.rerun()
 
-    with log3:
-        m_name = st.text_input("Food Name")
-        col_c, col_p, col_cb, col_f = st.columns(4)
-        m_cal = col_c.number_input("Kcal", min_value=0, step=10)
-        m_pro = col_p.number_input("Protein", min_value=0, step=1)
-        m_car = col_cb.number_input("Carbs", min_value=0, step=1)
-        m_fat = col_f.number_input("Fat", min_value=0, step=1)
-        if st.button("Save Manual"):
-            day['calories_in'] += m_cal; day['protein'] += m_pro; day['carbs'] += m_car; day['fat'] += m_fat
-            day['meals'].append(f"🔢 {m_name} ({m_cal} kcal)")
-            save_data(data); st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
+    # 3. Camera / Gallery Photo Scanner (Toggle-Protected)
+    with sub3:
+        cam_mode = st.radio("Choose Image Source", ["Upload from Gallery", "Turn On Camera"], horizontal=True)
+        img_file = None
+        if cam_mode == "Upload from Gallery":
+            img_file = st.file_uploader("Upload food photo", type=["jpg", "jpeg", "png"])
+        else:
+            enable_cam = st.toggle("🔓 Switch ON Camera")
+            if enable_cam:
+                img_file = st.camera_input("Snap your plate")
 
-# ================= ACTIVITY TAB =================
-with nav3:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.subheader("🏃‍♂️ Log Daily Exercise")
-    act_text = st.text_input("Type your workout (e.g., '30 min jogging')")
-    if st.button("Calculate Burned Calories"):
-        if act_text:
-            with st.spinner("Calculating..."):
-                act_prompt = f"User did: '{act_text}'. Estimate calories burned. Return ONLY valid JSON with keys: 'activity_name', 'calories_burned' (integer). No markdown."
-                act_res_text = model.generate_content(act_prompt)
+        if img_file and st.button("🔍 Scan Food Photo"):
+            with st.spinner("Scanning plate & estimating Indian portions..."):
+                img = Image.open(img_file)
+                prompt = """
+                Analyze this food photo (recognize Indian, Odia, South Indian, or general dishes).
+                Return ONLY valid JSON (no markdown) with exact keys:
+                {"title": "Meal Name (total grams)", "subtitle": "AI Photo Scan", "cal": 350, "c": 45, "p": 15, "f": 10, "is_exercise": false,
+                "items": [{"n": "Item 1 (g)", "cal": 200, "c": 30, "p": 5, "f": 2}]}
+                """
                 try:
-                    act_res = json.loads(act_res_text.text.replace('```json', '').replace('```', '').strip())
-                    st.success(f"Burned {act_res['calories_burned']} kcal from {act_res['activity_name']}")
-                    if st.button("Save Workout"):
-                        day['calories_burned'] += int(act_res['calories_burned'])
-                        day['activity'].append(f"🏃 {act_res['activity_name']} (-{act_res['calories_burned']} kcal)")
-                        save_data(data); st.rerun()
-                except:
-                    st.error("Error reading workout data.")
-    
-    if day['activity']:
-        st.write("---")
-        for act in day['activity']:
-            st.write(act)
+                    resp = model.generate_content([prompt, img])
+                    clean = resp.text.replace("```json", "").replace("```", "").strip()
+                    st.session_state["photo_draft"] = json.loads(clean)
+                except Exception as e:
+                    st.error(f"Photo scan failed: {e}")
+
+        if "photo_draft" in st.session_state:
+            pd = st.session_state["photo_draft"]
+            st.success(f"Detected: **{pd['title']}** ({pd['cal']} kcal)")
+            if st.button("💾 Save Photo Meal"):
+                pd["time"] = datetime.now().strftime("%I:%M %p")
+                day_log["entries"].append(pd)
+                save_data(data)
+                del st.session_state["photo_draft"]
+                st.rerun()
+
+# ----------------- TAB 3: WATER TRACKER -----------------
+with tab_water:
+    st.markdown('<div class="meal-card">', unsafe_allow_html=True)
+    st.subheader(f"💧 Hydration: {day_log['water_ml']} / {prof['water_goal']} ml")
+    st.progress(min(day_log["water_ml"] / max(prof["water_goal"], 1), 1.0))
+    w1, w2, w3 = st.columns(3)
+    if w1.button("+ 250ml Glass"):
+        day_log["water_ml"] += 250; save_data(data); st.rerun()
+    if w2.button("+ 500ml Bottle"):
+        day_log["water_ml"] += 500; save_data(data); st.rerun()
+    if w3.button("Reset Water"):
+        day_log["water_ml"] = 0; save_data(data); st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ================= PROFILE & BMI TAB =================
-with nav4:
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.subheader("⚖️ BMI Calculator")
-    h_cm = st.number_input("Height (cm)", min_value=50.0, max_value=250.0, value=float(profile.get("height_cm", 170.0)))
-    w_kg = st.number_input("Weight (kg)", min_value=20.0, max_value=200.0, value=float(profile.get("weight_kg", 70.0)))
-    
-    bmi = w_kg / ((h_cm / 100) ** 2)
-    st.write(f"**Your BMI is: {bmi:.1f}**")
-    
-    if bmi < 18.5: st.info("Status: Underweight")
-    elif 18.5 <= bmi < 24.9: st.success("Status: Normal weight")
-    elif 25 <= bmi < 29.9: st.warning("Status: Overweight")
-    else: st.error("Status: Obese")
-    st.markdown('</div>', unsafe_allow_html=True)
+# ----------------- TAB 4: BMI & DAILY GOALS -----------------
+with tab_prof:
+    st.markdown('<div class="meal-card">', unsafe_allow_html=True)
+    st.subheader("⚖️ BMI Calculator & Daily Targets")
+    c1, c2 = st.columns(2)
+    h = c1.number_input("Height (cm)", 100.0, 230.0, float(prof["height_cm"]))
+    w = c2.number_input("Weight (kg)", 30.0, 200.0, float(prof["weight_kg"]))
+    bmi = w / ((h / 100) ** 2)
+    st.write(f"**Your BMI:** `{bmi:.1f}` ({'Normal' if 18.5 <= bmi <= 24.9 else 'Adjust Target'})")
 
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.subheader("🎯 Set Your Daily Targets")
-    t_cal = st.number_input("Target Calories", value=profile.get("target_cals", 2200), step=100)
-    t_p = st.number_input("Target Protein (g)", value=profile.get("target_p", 120), step=5)
-    t_c = st.number_input("Target Carbs (g)", value=profile.get("target_c", 250), step=5)
-    t_f = st.number_input("Target Fat (g)", value=profile.get("target_f", 60), step=5)
-    
-    if st.button("Save Profile & Targets"):
-        profile["height_cm"] = h_cm
-        profile["weight_kg"] = w_kg
-        profile["target_cals"] = t_cal
-        profile["target_p"] = t_p
-        profile["target_c"] = t_c
-        profile["target_f"] = t_f
+    t_cal = st.number_input("Daily Calorie Target (kcal)", 1000, 4500, int(prof["target_cals"]), step=50)
+    mc1, mc2, mc3 = st.columns(3)
+    tc = mc1.number_input("Carbs (g)", 50, 500, int(prof["target_c"]))
+    tp = mc2.number_input("Protein (g)", 30, 300, int(prof["target_p"]))
+    tf = mc3.number_input("Fat (g)", 20, 200, int(prof["target_f"]))
+
+    if st.button("💾 Save Targets"):
+        prof.update({"height_cm": h, "weight_kg": w, "target_cals": t_cal, "target_c": tc, "target_p": tp, "target_f": tf})
         save_data(data)
-        st.success("Profile saved successfully!")
+        st.success("Targets updated!")
         st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
